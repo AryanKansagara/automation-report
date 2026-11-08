@@ -2,7 +2,7 @@
 
 Shows a head of support, from their own ticket history, which customer requests an AI agent could resolve, what that is worth, and what to fix first.
 
-**Live:** https://automation-report.vercel.app
+**Live:** https://automation-report-iota.vercel.app
 
 ## The pain
 
