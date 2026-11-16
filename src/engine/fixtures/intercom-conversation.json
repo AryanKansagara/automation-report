@@ -1,0 +1,25 @@
+{
+  "type": "conversation.list",
+  "conversations": [
+    {
+      "type": "conversation", "id": "147", "title": "Order arrived damaged", "created_at": 1771234567, "updated_at": 1771238167,
+      "source": { "type": "conversation", "id": "403918330", "delivered_as": "customer_initiated", "subject": "",
+        "body": "<p>Hi, my order arrived with a cracked screen. Can I get a replacement?</p>",
+        "author": { "type": "user", "id": "5017690" } },
+      "state": "closed", "open": false, "read": true,
+      "tags": { "type": "tag.list", "tags": [ { "type": "tag", "id": "123", "name": "Damaged item" } ] },
+      "conversation_rating": { "rating": 4, "remark": "", "created_at": 1771239000 },
+      "statistics": { "type": "conversation_statistics", "time_to_assignment": 0, "time_to_admin_reply": 240,
+        "time_to_first_close": 3600, "time_to_last_close": 3600, "median_time_to_reply": 240,
+        "first_close_at": 1771238167, "last_close_at": 1771238167, "count_reopens": 0, "count_assignments": 1,
+        "count_conversation_parts": 4 },
+      "ai_agent_participated": true,
+      "ai_agent": { "source_type": "essentials_plan_setup", "resolution_state": "routed_to_team", "last_answer_type": "ai_answer" },
+      "conversation_parts": { "type": "conversation_part.list", "total_count": 2, "conversation_parts": [
+        { "type": "conversation_part", "id": "1", "part_type": "comment", "body": "<p>Sorry about that! I've sent a replacement, it ships tomorrow.</p>", "author": { "type": "admin", "id": "991" } },
+        { "type": "conversation_part", "id": "2", "part_type": "close", "body": null, "author": { "type": "admin", "id": "991" } }
+      ] }
+    }
+  ],
+  "total_count": 1, "pages": { "type": "pages", "page": 1, "per_page": 20, "total_pages": 1 }
+}

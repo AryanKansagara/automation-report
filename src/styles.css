@@ -205,7 +205,7 @@ input[type='range'] { accent-color: var(--moss); width: 100%; }
 .table tr.sel { background: color-mix(in oklab, var(--moss) 8%, transparent); }
 .table .r { text-align: right; }
 .table.compact .hide-sm { display: none; }
-.scroll-x { overflow-x: auto; }
+.scroll-x { overflow-x: auto; min-width: 0; max-width: 100%; }
 
 /* ---------- tabs ---------- */
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }

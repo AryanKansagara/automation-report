@@ -42,7 +42,7 @@ export default function Docs() {
       <div className="page-head"><div><span className="eyebrow">Documentation</span><h1 style={{ marginTop: 8 }}>Getting your tickets out</h1><p className="muted" style={{ marginTop: 10, maxWidth: 640 }}>Export steps checked against each vendor’s help docs in November 2026. Menus move; if a step differs, the field names below are what matters.</p></div></div>
       <div className="docs-layout">
         <nav className="toc" aria-label="On this page">
-          {[['zendesk', 'Zendesk'], ['intercom', 'Intercom'], ['freshdesk', 'Freshdesk'], ['generic', 'Generic CSV / SQL'], ['articles', 'Help centre articles'], ['scoring', 'How scoring works'], ['roi', 'ROI assumptions'], ['privacy', 'Privacy and sync'], ['samples', 'Sample files']].map(([id, l]) => <a key={id} href={`#${id}`}>{l}</a>)}
+          {[['zendesk', 'Zendesk'], ['intercom', 'Intercom'], ['freshdesk', 'Freshdesk'], ['generic', 'Generic CSV / SQL'], ['articles', 'Help centre articles'], ['scoring', 'How scoring works'], ['roi', 'ROI assumptions'], ['privacy', 'Privacy and sync'], ['formats', 'Format references'], ['samples', 'Sample files']].map(([id, l]) => <a key={id} href={`#${id}`}>{l}</a>)}
         </nav>
         <div className="docs">
           <h2 id="zendesk" style={{ marginTop: 0 }}>Zendesk</h2>
@@ -56,7 +56,9 @@ export default function Docs() {
           </ol>
           <p>Fields used: <code>subject</code>, <code>description</code>, <code>via.channel</code>, <code>created_at</code>, <code>tags</code>, <code>satisfaction_rating.score</code>, <code>metric_set.reopens</code>, <code>metric_set.solved_at</code>, <code>metric_set.full_resolution_time_in_minutes</code>, <code>metric_set.group_stations</code>, and public <code>comments</code> by someone other than the requester (agent replies).</p>
           <h3>CSV export</h3>
-          <p>Same screen, choose <b>CSV</b>. Zendesk’s CSV leaves out descriptions and comments, so intents come from subjects only. Detected columns include <code>Id</code>, <code>Subject</code>, <code>Via</code>, <code>Created at</code>, <code>Solved at</code>, <code>Satisfaction Score</code>, <code>Reopens</code>, <code>Replies</code>, <code>Tags</code>, <code>Group stations</code> and <code>Full resolution time in minutes</code>.</p>
+          <p>Same screen, choose <b>CSV</b>. Zendesk’s CSV leaves out descriptions and comments, so intents come from subjects only. Detected columns include <code>ID</code>, <code>Subject</code>, <code>Via</code>, <code>Created at</code>, <code>Solved at</code>, <code>Satisfaction Score</code>, <code>Reopens</code>, <code>Replies</code>, <code>Tags</code>, <code>Group stations</code> and <code>Full resolution time in minutes</code>. Dates are in the account’s time zone, as Zendesk exports them.</p>
+          <h3>Tickets API</h3>
+          <p>A saved response from <code>/api/v2/tickets.json?include=metric_sets</code> or the incremental export also works: sideloaded <code>metric_sets</code> are joined to their tickets by <code>ticket_id</code>.</p>
 
           <h2 id="intercom">Intercom</h2>
           <h3>Dataset export (CSV)</h3>
@@ -73,7 +75,7 @@ export default function Docs() {
           <ol>
             <li>Open <b>Tickets</b>, filter to the period you want, then click <b>Export</b>.</li>
             <li>Choose CSV and tick: Ticket ID, Subject, Description, Source, Created time, Resolved time, Resolution time (in hrs), Agent interactions, Tags, and Survey results if your plan exposes it.</li>
-            <li>Freshdesk emails the file. Upload it; resolution hours are converted to minutes automatically.</li>
+            <li>Freshdesk emails the file. Upload it; resolution time is read as decimal hours or as <code>hh:mm:ss</code> and converted to minutes. Day-first dates (<code>25/03/2026</code>) are detected from the file as a whole, so <code>03/04/2026</code> in the same file reads as 3 April.</li>
           </ol>
           <p>Admins can also schedule this from <b>Admin → Account → Data exports</b>.</p>
 
@@ -97,7 +99,7 @@ export default function Docs() {
             <li><b>Customer sentiment</b> (12%) and <b>escalation history</b> (12%).</li>
             <li><b>Reopen rate</b> (10%), <b>time to resolve</b> vs your median (8%), and <b>satisfaction today</b> (6%).</li>
           </ul>
-          <p>Verdicts: <b>human only</b> if the score is under 42, more than 35% of messages are angry, or more than 40% were escalated; <b>needs action API</b> if 30%+ ask for an account change; otherwise <b>automatable</b>. You can override any verdict.</p>
+          <p>Verdicts: <b>human only</b> if the score is under 42, more than 35% of messages are angry, or more than 40% were escalated, or half the cluster is spam, tests or messages with no question in them (“ok”, “thanks!”), which keeps that noise out of the ROI; <b>needs action API</b> if 30%+ ask for an account change; otherwise <b>automatable</b>. You can override any verdict.</p>
           <p>The number of intents is chosen by silhouette score on a 450-ticket sample (k = 6–22), taking the smallest k within 12% of the best. Merge and split to taste.</p>
 
           <h2 id="roi">ROI assumptions</h2>
@@ -119,8 +121,11 @@ export default function Docs() {
             <li>Account menu: export all your data as JSON, delete your cloud data, or delete your account.</li>
           </ul>
 
+          <h2 id="formats">Format references</h2>
+          <p>The importers are tested against fixtures laid out like each vendor’s documented export (checked November 2026): the 40 columns listed in Zendesk’s <a href="https://support.zendesk.com/hc/en-us/articles/4408886165402" target="_blank" rel="noreferrer">Exporting ticket, user, or organization data</a> article, the Zendesk Tickets API ticket and metric set objects, Intercom’s Conversations API conversation object (whose durations are in seconds), and a Freshdesk ticket list CSV. Real exports from your account may have extra columns; they are ignored, and you can remap any field on the import screen.</p>
+
           <h2 id="samples">Sample files</h2>
-          <p>Northwind Outfitters is a fictional outdoor-apparel store. Its tickets are synthetic, generated with fifteen intents, noise (spam, vague replies, French and Spanish), quoted replies, signatures, HTML and planted PII. October simulates an AI agent going live for order status and sizing.</p>
+          <p>Northwind Outfitters is a fictional outdoor-apparel store. Its tickets are synthetic, generated with fifteen intents, noise (spam, vague replies, French and Spanish; spam and empty replies are recognised and kept out of the ROI), quoted replies, signatures, HTML and planted PII. October simulates an AI agent going live for order status and sizing.</p>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => download('northwind-zendesk-sep-2026.json', sampleNdjson(0), 'application/x-ndjson')}><Icon name="download" size={15} />Zendesk JSON · September</button>
             <button className="btn sm" onClick={() => download('northwind-zendesk-oct-2026.json', sampleNdjson(1), 'application/x-ndjson')}><Icon name="download" size={15} />Zendesk JSON · October</button>

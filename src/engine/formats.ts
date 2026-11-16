@@ -77,22 +77,28 @@ export function suggestMapping(header: string[]): Mapping {
 
 // ---------- value parsers ----------
 
-export function parseDate(v: unknown): number | null {
+/** True when a slash/dot date column is day-first (any value like 25/03/2026). */
+export function isDayFirst(values: unknown[]): boolean {
+  return values.some(v => { const m = String(v ?? '').trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-]\d{4}/); return !!m && +m[1] > 12 && +m[2] <= 12 })
+}
+
+export function parseDate(v: unknown, dayFirst = false): number | null {
   if (v == null || v === '') return null
   if (typeof v === 'number') return v < 1e11 ? v * 1000 : v
   const s = String(v).trim()
   if (/^\d{9,10}$/.test(s)) return +s * 1000
   if (/^\d{12,13}$/.test(s)) return +s
-  let iso = s.replace(/^(\d{4}-\d{2}-\d{2}) (\d)/, '$1T$2').replace(/ ?([+-]\d{2}):?(\d{2})$/, '$1:$2').replace(/ UTC$/, 'Z')
-  let t = Date.parse(iso)
-  if (Number.isNaN(t)) {
-    const m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?$/i)
-    if (m) {
-      let hh = +(m[4] ?? 0)
-      if (m[7]) hh = (hh % 12) + (/pm/i.test(m[7]) ? 12 : 0)
-      t = new Date(+m[3], +m[1] - 1, +m[2], hh, +(m[5] ?? 0), +(m[6] ?? 0)).getTime()
-    }
+  // Slash and dot dates are read here, not by Date.parse, which always assumes month first.
+  const m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?$/i)
+  if (m) {
+    let hh = +(m[4] ?? 0)
+    if (m[7]) hh = (hh % 12) + (/pm/i.test(m[7]) ? 12 : 0)
+    const [mo, d] = dayFirst ? [+m[2], +m[1]] : [+m[1], +m[2]]
+    const t = new Date(+m[3], mo - 1, d, hh, +(m[5] ?? 0), +(m[6] ?? 0)).getTime()
+    return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 ? t : null
   }
+  const iso = s.replace(/^(\d{4}-\d{2}-\d{2}) (\d)/, '$1T$2').replace(/ ?([+-]\d{2}):?(\d{2})$/, '$1:$2').replace(/ UTC$/, 'Z')
+  const t = Date.parse(iso)
   return Number.isNaN(t) ? null : t
 }
 
@@ -124,7 +130,9 @@ export function parseNum(v: unknown): number | null {
 export function parseTags(v: unknown): string[] {
   if (Array.isArray(v)) return v.map(t => (typeof t === 'string' ? t : (t as { name?: string }).name ?? '')).filter(Boolean)
   if (v && typeof v === 'object' && Array.isArray((v as { tags?: unknown[] }).tags)) return parseTags((v as { tags: unknown[] }).tags)
-  return String(v ?? '').split(/[,;|]|\s(?=\S)/).map(t => t.trim()).filter(Boolean)
+  // Zendesk separates tags with spaces (tags cannot contain them); Freshdesk and Intercom use commas and allow spaces inside a tag.
+  const s = String(v ?? '')
+  return s.split(/[,;|]/.test(s) ? /[,;|]/ : /\s+/).map(t => t.trim()).filter(Boolean)
 }
 
 const ESC_TAG = /escalat|tier[ _-]?2|tier[ _-]?3|manager|supervisor|handoff|hand[ _-]?over|transfer|complaint/i
@@ -145,7 +153,7 @@ export interface ValidationReport {
 
 export interface RawRecord { line: number; get: (f: Field) => unknown }
 
-function normalizeRecords(records: RawRecord[], format: FormatId, opts: RedactOptions, hoursField: boolean): { tickets: Ticket[]; report: ValidationReport } {
+function normalizeRecords(records: RawRecord[], format: FormatId, opts: RedactOptions, hoursField: boolean, dayFirst = false): { tickets: Ticket[]; report: ValidationReport } {
   const report: ValidationReport = { format, total: records.length, imported: 0, issues: [], pii: {}, coverage: {}, samples: [] }
   const tickets: Ticket[] = []
   const seen = new Set<string>()
@@ -163,14 +171,16 @@ function normalizeRecords(records: RawRecord[], format: FormatId, opts: RedactOp
     if (seen.has(id)) { report.issues.push({ line: rec.line, message: `Duplicate ticket id ${id}; kept the first` }); continue }
     seen.add(id)
     const createdRaw = rec.get('createdAt')
-    const createdAt = parseDate(createdRaw)
+    const createdAt = parseDate(createdRaw, dayFirst)
     if (createdRaw && createdAt == null) report.issues.push({ line: rec.line, message: `Unreadable created date "${String(createdRaw).slice(0, 40)}"` })
-    const solvedAt = parseDate(rec.get('solvedAt'))
+    const solvedAt = parseDate(rec.get('solvedAt'), dayFirst)
     const tags = parseTags(rec.get('tags')).map(t => t.toLowerCase())
     const replyRaw = rec.get('agentReplies')
     const agentReplies = (Array.isArray(replyRaw) ? replyRaw : replyRaw ? [replyRaw] : []).map(r => scrub(String(r))).filter(Boolean)
-    let handle = parseNum(rec.get('handleMinutes'))
-    if (handle != null && hoursField) handle *= 60
+    const handleRaw = rec.get('handleMinutes')
+    let handle = parseNum(handleRaw)
+    // "Resolution time (in hrs)" arrives as decimal hours or as hh:mm:ss; parseNum already turns hh:mm:ss into minutes.
+    if (handle != null && hoursField && !/:/.test(String(handleRaw))) handle *= 60
     if (handle == null && createdAt != null && solvedAt != null && solvedAt > createdAt) handle = (solvedAt - createdAt) / 60000
     const stations = parseNum(rec.get('groupStations'))
     const escRaw = rec.get('escalated')
@@ -200,8 +210,10 @@ function normalizeRecords(records: RawRecord[], format: FormatId, opts: RedactOp
 export function normalizeCsv(table: CsvTable, mapping: Mapping, format: FormatId, opts: RedactOptions = {}) {
   const idx = Object.fromEntries(Object.entries(mapping).map(([f, col]) => [f, table.header.indexOf(col!)])) as Partial<Record<Field, number>>
   const records: RawRecord[] = table.rows.map((row, i) => ({ line: table.lines[i], get: f => (idx[f] != null && idx[f]! >= 0 ? row[idx[f]!] : undefined) }))
-  const hours = /hrs|hours/i.test(mapping.handleMinutes ?? '')
-  const out = normalizeRecords(records, format, opts, hours)
+  const hours = /hrs|hours/i.test(mapping.handleMinutes ?? '') || (format === 'zendesk-csv' && mapping.handleMinutes === 'Resolution time')
+  const dateCols = [idx.createdAt, idx.solvedAt].filter((i): i is number => i != null && i >= 0)
+  const dayFirst = isDayFirst(table.rows.flatMap(r => dateCols.map(i => r[i])))
+  const out = normalizeRecords(records, format, opts, hours, dayFirst)
   out.report.issues.unshift(...table.issues)
   return out
 }
@@ -217,7 +229,9 @@ export function parseJsonRecords(text: string): { records: Obj[]; issues: { line
     try {
       const j = JSON.parse(trimmed)
       const arr = Array.isArray(j) ? j : j.tickets ?? j.conversations ?? j.data ?? [j]
-      return { records: arr.map((r: Obj) => r.ticket ?? r), issues }
+      // GET /api/v2/tickets?include=metric_sets sideloads metrics as a top-level array keyed by ticket_id.
+      const ms = new Map<unknown, Obj>(Array.isArray(j.metric_sets) ? j.metric_sets.map((m: Obj) => [m.ticket_id, m]) : [])
+      return { records: arr.map((r: Obj) => { const t = r.ticket ?? r; return !t.metric_set && ms.has(t.id) ? { ...t, metric_set: ms.get(t.id) } : t }), issues }
     } catch { /* fall through to NDJSON */ }
   }
   const records: Obj[] = []
@@ -263,7 +277,7 @@ function intercomGet(r: Obj): RawRecord['get'] {
   return f => {
     switch (f) {
       case 'id': return r.id
-      case 'subject': return r.source?.subject ?? r.title
+      case 'subject': return r.source?.subject || r.title
       case 'body': return r.source?.body
       case 'channel': return r.source?.type ?? r.source?.delivered_as
       case 'createdAt': return r.created_at

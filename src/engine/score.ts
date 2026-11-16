@@ -2,7 +2,7 @@
 // value with a weight and a plain-English detail, so the score explains itself.
 
 import type { Ticket } from './formats.ts'
-import { clamp, dot, median, mean } from './util.ts'
+import { clamp, dot, median, mean, tokens } from './util.ts'
 import { lexicalEmbed } from './lexical.ts'
 
 export type Tier = 'automatable' | 'action' | 'human'
@@ -35,6 +35,14 @@ export function negativity(text: string): number {
   return Math.min(1, s)
 }
 
+const SPAM = /\b(seo|backlinks?|guest post|click here|claim (it )?now|you('ve| have) won|partnership opportunity|influencer marketing|lead generation|build you an? (mobile )?(app|website)|web design services)\b/i
+
+/** Spam, or a message with no request in it ("ok", "thanks!", "test"). Subject-only exports are never judged contentless. */
+export function isNoise(t: Pick<Ticket, 'subject' | 'body'>): boolean {
+  if (SPAM.test(`${t.subject} ${t.body}`)) return true
+  return t.body.trim().length > 0 && t.body.length < 40 && (tokens(t.body).length === 0 || /^\s*(test(ing)?|asdf)\W*$/i.test(t.body))
+}
+
 export function detectActions(texts: string[]): { id: string; share: number }[] {
   const hits = new Map<string, number>()
   for (const t of texts) for (const a of ACTIONS) if (a.re.test(t)) hits.set(a.id, (hits.get(a.id) ?? 0) + 1)
@@ -55,6 +63,8 @@ export interface Signals {
   negativeRate: number
   escalationRate: number
   csat: number | null
+  /** Share of spam or contentless tickets. Missing on snapshots made before it existed. */
+  noiseShare?: number
 }
 
 const pct = (x: number) => `${Math.round(x * 100)}%`
@@ -92,6 +102,7 @@ export function computeSignals(members: Ticket[], cohesion: number, cohesionRank
     negativeRate: mean(texts.map(t => (negativity(t) >= 0.5 ? 1 : 0))),
     escalationRate: mean(members.map(t => (t.escalated ? 1 : 0))),
     csat: csats.length >= 5 ? mean(csats) : null,
+    noiseShare: mean(members.map(t => (isNoise(t) ? 1 : 0))),
   }
 }
 
@@ -110,7 +121,9 @@ export function scoreSignals(s: Signals): { score: number; tier: Tier; factors: 
   for (const x of f) x.weight /= wsum
   const score = Math.round(100 * f.reduce((a, x) => a + x.weight * x.value, 0))
   let tier: Tier = 'automatable'
-  if (score < 42 || s.negativeRate > 0.35 || s.escalationRate > 0.4) tier = 'human'
+  const noise = s.noiseShare ?? 0
+  if (noise >= 0.5) f.push({ key: 'noise', label: 'Not a real request', weight: 0, value: 0, detail: `${pct(noise)} are spam, tests or messages with no question; kept out of automation estimates` })
+  if (score < 42 || s.negativeRate > 0.35 || s.escalationRate > 0.4 || noise >= 0.5) tier = 'human'
   else if (s.writeShare >= 0.3) tier = 'action'
   return { score, tier, factors: f }
 }
