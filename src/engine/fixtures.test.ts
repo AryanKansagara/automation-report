@@ -108,3 +108,17 @@ test('score: a cluster that is mostly noise is kept out of automation as human o
   const real = Array.from({ length: 10 }, () => tk('Where is my order?', 'When will my parcel arrive? It shipped a week ago.'))
   assert.notEqual(scoreSignals(computeSignals(real, 0.9, 1, null)).tier, 'human')
 })
+
+test('roi: hand-checked payback and net for one intent with no ramp', async () => {
+  const { project, DEFAULT_ROI } = await import('./roi.ts')
+  // 100 tickets/mo, automatable, score 50: rate 0.7 × (0.6 + 0.8 × 0.5) = 0.7, so 70 resolved/mo.
+  // Net per resolution $6 − $1 = $5, so $350/mo; $700 setup pays back in exactly 2 months.
+  const it = { id: 'i0', tier: 'automatable', score: 50, size: 100 } as any
+  const s = { intents: [it], total: 100, months: 1 } as any
+  const p = project(s, { ...DEFAULT_ROI, rampMonths: 0, horizonMonths: 12, setupCost: 700 }, 'base')
+  assert.ok(Math.abs(p.fullRamp.resolved - 70) < 1e-9)
+  assert.ok(Math.abs(p.fullRamp.net - 350) < 1e-9)
+  assert.ok(Math.abs(p.paybackMonth! - 2) < 1e-9)
+  assert.ok(Math.abs(p.totalNet - 350 * 12) < 1e-9, 'totalNet is before setup; the UI subtracts setup once')
+  assert.ok(Math.abs(p.fullRamp.hours - 70 * 9 / 60) < 1e-9)
+})

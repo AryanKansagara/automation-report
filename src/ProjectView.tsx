@@ -111,7 +111,7 @@ export function Kpis({ p, s }: { p: Project; s: Snapshot }) {
     <div className="kpis">
       <div className="kpi"><span className="xs faint">AI could resolve</span><b style={{ color: 'var(--tier-auto)' }}>{fmtPct(b.fullRamp.share)}</b><span className="range">{fmtPct(c.fullRamp.share)} – {fmtPct(o.fullRamp.share)} · {fmtInt(b.fullRamp.resolved)} tickets/mo</span></div>
       <div className="kpi"><span className="xs faint">Agent hours saved / mo</span><b>{fmtInt(b.fullRamp.hours)}</b><span className="range">{fmtInt(c.fullRamp.hours)} – {fmtInt(o.fullRamp.hours)} at full ramp</span></div>
-      <div className="kpi"><span className="xs faint">Net savings, first {p.roi.horizonMonths} mo</span><b>{fmtMoney(b.monthly[b.monthly.length - 1].cumulative + p.roi.setupCost)}</b><span className="range">{fmtMoney(c.totalNet)} – {fmtMoney(o.totalNet)} before setup cost</span></div>
+      <div className="kpi"><span className="xs faint">Net savings, first {p.roi.horizonMonths} mo</span><b>{fmtMoney(b.totalNet - p.roi.setupCost)}</b><span className="range">{fmtMoney(c.totalNet - p.roi.setupCost)} – {fmtMoney(o.totalNet - p.roi.setupCost)} after {fmtMoney(p.roi.setupCost)} setup</span></div>
       <div className="kpi"><span className="xs faint">Payback</span><b>{pb(b.paybackMonth)}</b><span className="range">{pb(o.paybackMonth)} – {pb(c.paybackMonth)} · setup {fmtMoney(p.roi.setupCost)}</span></div>
     </div>
   )
