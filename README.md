@@ -35,4 +35,4 @@ npm run cache      # regenerate public/emb/*.bin after changing the sample gener
 
 Cloud sync needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`; without them the app runs fully local.
 
-Built by Aryan Kansagara. Independent project, not affiliated with Ada.
+Built by Aryan Kansagara.

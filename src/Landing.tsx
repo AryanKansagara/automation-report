@@ -136,7 +136,7 @@ export function Landing() {
 export function Footer() {
   return (
     <footer className="wrap footer">
-      <span>Built by Aryan Kansagara. Independent project, not affiliated with Ada.</span>
+      <span>Built by Aryan Kansagara.</span>
       <span><Link to="/docs">Docs</Link><Link to="/app/settings">Settings</Link><Link to="/app">Open the app</Link></span>
     </footer>
   )
