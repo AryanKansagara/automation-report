@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 4333",
     "test": "node --test \"src/**/*.test.ts\"",
-    "cache": "node scripts/build-cache.ts"
+    "cache": "node scripts/build-cache.ts",
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.7.0",
@@ -17,6 +18,7 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

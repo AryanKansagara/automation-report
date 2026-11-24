@@ -26,12 +26,15 @@ Includes a synthetic e-commerce sample (2,550 tickets over two months, 15 intent
 ## Run locally
 
 ```bash
-npm install
+npm ci             # or npm install
 npm run dev        # http://localhost:4333
 npm test           # engine tests
 npm run build
+npm run test:e2e   # builds, then runs the Playwright (Chromium) suite against `vite preview`
 npm run cache      # regenerate public/emb/*.bin after changing the sample generator
 ```
+
+The first time, run `npx playwright install chromium` to download the browser the E2E suite uses. The suite runs signed out with all external network requests blocked and does not download the embedding model. A committed `.npmrc` sets `onnxruntime-node-install-cuda=skip`, so `npm ci` works on Linux without CUDA downloads (the app only runs the model in the browser).
 
 Cloud sync needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`; without them the app runs fully local.
 
