@@ -127,13 +127,17 @@ export function parseNum(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-export function parseTags(v: unknown): string[] {
+/** `splitLike` is the text that decides the separator; pass the raw value when `v` is its redacted form. */
+export function parseTags(v: unknown, splitLike?: string): string[] {
   if (Array.isArray(v)) return v.map(t => (typeof t === 'string' ? t : (t as { name?: string }).name ?? '')).filter(Boolean)
   if (v && typeof v === 'object' && Array.isArray((v as { tags?: unknown[] }).tags)) return parseTags((v as { tags: unknown[] }).tags)
   // Zendesk separates tags with spaces (tags cannot contain them); Freshdesk and Intercom use commas and allow spaces inside a tag.
   const s = String(v ?? '')
-  return s.split(/[,;|]/.test(s) ? /[,;|]/ : /\s+/).map(t => t.trim()).filter(Boolean)
+  return s.split(/[,;|]/.test(splitLike ?? s) ? /[,;|]/ : /\s+/).map(t => t.trim()).filter(Boolean)
 }
+
+/** Lowercases text but leaves redaction tokens such as [EMAIL] as they are. */
+const lowerKeepTokens = (s: string) => s.replace(/\[[A-Z]+\]|[^[]+|\[/g, m => (/^\[[A-Z]+\]$/.test(m) ? m : m.toLowerCase()))
 
 const ESC_TAG = /escalat|tier[ _-]?2|tier[ _-]?3|manager|supervisor|handoff|hand[ _-]?over|transfer|complaint/i
 const truthy = (v: unknown) => /^(true|yes|y|1|escalated)$/i.test(String(v ?? '').trim())
@@ -156,25 +160,43 @@ export interface RawRecord { line: number; get: (f: Field) => unknown }
 function normalizeRecords(records: RawRecord[], format: FormatId, opts: RedactOptions, hoursField: boolean, dayFirst = false): { tickets: Ticket[]; report: ValidationReport } {
   const report: ValidationReport = { format, total: records.length, imported: 0, issues: [], pii: {}, coverage: {}, samples: [] }
   const tickets: Ticket[] = []
-  const seen = new Set<string>()
+  const seen = new Map<string, number>()
+  // Ids that are not PII are kept as given; a neutral id must not collide with one of them.
+  const rawIds = records.map(r => String(r.get('id') ?? '').trim())
+  const idSpans = rawIds.map(id => (id ? redact(id, opts).spans : []))
+  const plainIds = new Set(rawIds.filter((id, i) => id && !idSpans[i].length))
+  // Short fields (id, channel, tags): redacted and counted, but not cleaned or offered as preview samples.
+  const scrubField = (s: string) => { const r = redact(s, opts); countKinds(r.spans, report.pii); return r.text }
   const scrub = (s: string) => {
     const r = redact(s, opts)
     countKinds(r.spans, report.pii)
     if (r.spans.length && report.samples.length < 6 && s.length < 600) report.samples.push({ before: s, after: r.text, cleaned: cleanMessage(r.text), spans: r.spans })
     return cleanMessage(r.text)
   }
-  for (const rec of records) {
+  for (const [n, rec] of records.entries()) {
     const rawSubject = String(rec.get('subject') ?? '')
     const rawBody = String(rec.get('body') ?? '')
     if (!rawSubject.trim() && !rawBody.trim()) { report.issues.push({ line: rec.line, message: 'No subject or message text; row skipped' }); continue }
-    let id = String(rec.get('id') ?? '').trim() || `row-${rec.line}`
-    if (seen.has(id)) { report.issues.push({ line: rec.line, message: `Duplicate ticket id ${id}; kept the first` }); continue }
-    seen.add(id)
+    // Duplicates are found on the raw id, before redaction, so two different people do not merge into one [EMAIL] ticket.
+    const rawId = rawIds[n] || `row-${rec.line}`
+    const firstLine = seen.get(rawId)
+    if (firstLine != null) { report.issues.push({ line: rec.line, message: `Duplicate ticket id (first seen on line ${firstLine}); kept the first` }); continue }
+    seen.set(rawId, rec.line)
+    // An id that contains PII is replaced by a neutral id, unique within the import. Plain ids are unchanged.
+    let id = rawId
+    if (idSpans[n].length) {
+      countKinds(idSpans[n], report.pii)
+      id = `redacted-${rec.line}`
+      while (plainIds.has(id)) id += '_'
+    }
     const createdRaw = rec.get('createdAt')
     const createdAt = parseDate(createdRaw, dayFirst)
-    if (createdRaw && createdAt == null) report.issues.push({ line: rec.line, message: `Unreadable created date "${String(createdRaw).slice(0, 40)}"` })
+    if (createdRaw && createdAt == null) report.issues.push({ line: rec.line, message: 'Unreadable created date; left empty' })
     const solvedAt = parseDate(rec.get('solvedAt'), dayFirst)
-    const tags = parseTags(rec.get('tags')).map(t => t.toLowerCase())
+    // Escalation is read from the raw tags (a PII-bearing tag like "escalated-by-<email>" still counts), then the tags are redacted.
+    const tagsRaw = rec.get('tags')
+    const escalatedByTag = parseTags(tagsRaw).some(t => ESC_TAG.test(t))
+    const tags = (typeof tagsRaw === 'string' ? parseTags(scrubField(tagsRaw), tagsRaw) : parseTags(tagsRaw).map(scrubField)).map(lowerKeepTokens).filter(Boolean)
     const replyRaw = rec.get('agentReplies')
     const agentReplies = (Array.isArray(replyRaw) ? replyRaw : replyRaw ? [replyRaw] : []).map(r => scrub(String(r))).filter(Boolean)
     const handleRaw = rec.get('handleMinutes')
@@ -188,13 +210,13 @@ function normalizeRecords(records: RawRecord[], format: FormatId, opts: RedactOp
       id,
       subject: scrub(rawSubject),
       body: scrub(rawBody),
-      channel: String(rec.get('channel') ?? '').toLowerCase().trim() || 'unknown',
+      channel: lowerKeepTokens(scrubField(String(rec.get('channel') ?? ''))).trim() || 'unknown',
       createdAt, solvedAt, agentReplies,
       replies: parseNum(rec.get('replies')),
       reopens: parseNum(rec.get('reopens')),
       csat: parseCsat(rec.get('csat')),
       tags,
-      escalated: truthy(escRaw) || tags.some(t => ESC_TAG.test(t)) || (stations != null && stations > 1),
+      escalated: truthy(escRaw) || escalatedByTag || (stations != null && stations > 1),
       handleMinutes: handle,
     }
     for (const f of Object.keys(FIELD_LABELS) as Field[]) {

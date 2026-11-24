@@ -1,0 +1,17 @@
+id,subject,description,channel,created_at,tags
+alex.sample@example.com,Refund for my order,"Hi, my name is José Álvarez and I connected from 2001:db8::8a2e:370:7334. Please refund order 100234.",email,2026-10-01T09:00:00Z,"refund,vip"
+sam.sample@example.net,Question about my invoice,MY NAME IS Zed. Please write to josé@exämple.com about the invoice.,chat sam.sample@example.net,2026-10-02T09:00:00Z,"billing,escalated-by-erin.sample@example.com"
+alex.sample@example.com,Refund for my order (repeat),"Sending this again, nothing new.",email,2026-10-03T09:00:00Z,refund
+T-1004,Name on the invoice,"Hello, my name is Élodie Roy. my name is wrong on the invoice, can you fix it?",web,2026-10-04T09:00:00Z,callback-415-555-0147
+T-1005,Device log question,The log shows 10:30:45 on device 00:1A:2B:3C:4D:5E running v2.4.1 for order #100234.,web,2026-10-05T09:00:00Z,device
+T-1006,Reset my password,"I cannot log in and need a password reset, attempt number 6.",web,2026-10-06T09:00:00Z,login
+T-1007,Reset my password,"I cannot log in and need a password reset, attempt number 7.",web,2026-10-07T09:00:00Z,login
+T-1008,Reset my password,"I cannot log in and need a password reset, attempt number 8.",web,2026-10-08T09:00:00Z,login
+T-1009,Reset my password,"I cannot log in and need a password reset, attempt number 9.",web,2026-10-09T09:00:00Z,login
+T-1010,Reset my password,"I cannot log in and need a password reset, attempt number 10.",web,2026-10-10T09:00:00Z,login
+T-1011,Reset my password,"I cannot log in and need a password reset, attempt number 11.",web,2026-10-11T09:00:00Z,login
+T-1012,Reset my password,"I cannot log in and need a password reset, attempt number 12.",web,2026-10-12T09:00:00Z,login
+T-1013,Reset my password,"I cannot log in and need a password reset, attempt number 13.",web,2026-10-13T09:00:00Z,login
+T-1014,Reset my password,"I cannot log in and need a password reset, attempt number 14.",web,2026-10-14T09:00:00Z,login
+T-1015,Reset my password,"I cannot log in and need a password reset, attempt number 15.",web,2026-10-15T09:00:00Z,login
+T-1016,Reset my password,"I cannot log in and need a password reset, attempt number 16.",web,2026-10-16T09:00:00Z,login

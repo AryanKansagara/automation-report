@@ -20,17 +20,56 @@ function luhn(digits: string): boolean {
 }
 
 const SUFFIX = 'Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Way|Court|Ct|Place|Pl|Crescent|Cres|Terrace|Ter|Parkway|Pkwy|Circle|Cir|Highway|Hwy|Square|Sq'
-const RULES: { kind: PiiKind; re: RegExp; check?: (m: string) => boolean; opt?: keyof RedactOptions }[] = [
-  { kind: 'email', re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g },
+
+// A name after a self-introduction cue: one or two words, each starting with a capital letter
+// (any script that has case), so "my name is José Álvarez" is caught but "my name is wrong on the invoice" is not.
+const NAME_WORD = "\\p{L}[\\p{L}\\p{M}'’-]*"
+const NAME_STOP = new Set('a an and or but so on in at the is was i im for to from with please here there wrong incorrect correct right not misspelled spelled missing different listed shown printed'.split(' '))
+function nameLength(m: string): number {
+  let end = 0
+  for (const w of [...m.matchAll(/\S+/gu)].slice(0, 2)) {
+    const word = w[0].replace(/['’-]+$/, '')
+    if (!/^\p{Lu}/u.test(word) || NAME_STOP.has(word.toLowerCase())) break
+    end = w.index + word.length
+  }
+  return end
+}
+
+/** True for a syntactically valid IPv6 address. Times (10:30:45), MAC addresses and version numbers are not. */
+export function isIpv6(s: string): boolean {
+  if (!/^[0-9A-Fa-f:.]+$/.test(s)) return false
+  const v4 = s.match(/^(.*:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (v4) {
+    if ([v4[2], v4[3], v4[4], v4[5]].some(o => +o > 255)) return false
+    s = `${v4[1]}0:0`
+  }
+  if (s.includes('.')) return false
+  const parts = s.split('::')
+  if (parts.length > 2) return false
+  const groups = (x: string) => (x === '' ? [] : x.split(':'))
+  const ok = (g: string[]) => g.every(h => /^[0-9A-Fa-f]{1,4}$/.test(h))
+  if (parts.length === 1) {
+    const g = groups(s)
+    // Eight pairs of hex digits is an EUI-64 / colon-hex byte string, not an address.
+    return g.length === 8 && ok(g) && !g.every(h => h.length === 2)
+  }
+  const a = groups(parts[0]), b = groups(parts[1])
+  return ok(a) && ok(b) && a.length + b.length >= 1 && a.length + b.length <= 7
+}
+const ipv6Length = (m: string) => { const t = m.replace(/\.+$/, ''); return isIpv6(t) ? t.length : 0 }
+
+const RULES: { kind: PiiKind; re: RegExp; check?: (m: string) => boolean; take?: (m: string) => number; opt?: keyof RedactOptions }[] = [
+  { kind: 'email', re: /[\p{L}\p{M}\p{N}._%+-]+@[\p{L}\p{M}\p{N}.-]+\.\p{L}{2,}/gu },
   { kind: 'card', re: /\b(?:\d[ -]?){12,18}\d\b/g, check: m => { const d = m.replace(/\D/g, ''); return d.length >= 13 && d.length <= 19 && luhn(d) } },
   { kind: 'phone', re: /(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)\s?|\b\d{3}[\s.-])\d{3}[\s.-]\d{4}\b/g },
   { kind: 'phone', re: /\+\d[\d\s().-]{8,16}\d/g },
   { kind: 'phone', re: /(?<=\b(?:phone|call|text|cell|mobile|tel|number is)[:\s]+(?:me\s+(?:at|on)\s+)?)\d{10,11}\b/gi },
   { kind: 'ip', re: /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g },
+  { kind: 'ip', re: /(?<![\p{L}\p{N}_:.])[0-9A-Fa-f:.]{2,45}(?![\p{L}\p{N}_:])/gu, take: ipv6Length },
   { kind: 'address', opt: 'addresses', re: new RegExp(`\\b\\d{1,5}\\s+(?:[A-Z][A-Za-z'.]*\\s+){1,4}(?:${SUFFIX})\\b\\.?(?:,?\\s*(?:Apt|Unit|Suite|#)\\.?\\s*[\\w-]+)?`, 'g') },
   { kind: 'address', opt: 'addresses', re: /\b[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] ?\d[ABCEGHJ-NPRSTV-Z]\d\b/g },
   { kind: 'address', opt: 'addresses', re: /\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|ON|QC|BC|AB)\s+\d{5}(?:-\d{4})?\b/g },
-  { kind: 'name', opt: 'names', re: /(?<=\b(?:[Mm]y name is|[Nn]ame:)\s+)[A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+)?/g },
+  { kind: 'name', opt: 'names', re: new RegExp(`(?<=\\b(?:my\\s+name\\s+is|name:)\\s+)${NAME_WORD}(?:[ \\t]+${NAME_WORD})?`, 'giu'), take: nameLength },
 ]
 
 export function findPii(text: string, opts: RedactOptions = {}): Span[] {
@@ -40,7 +79,8 @@ export function findPii(text: string, opts: RedactOptions = {}): Span[] {
     if (r.opt && !o[r.opt]) continue
     for (const m of text.matchAll(r.re)) {
       if (r.check && !r.check(m[0])) continue
-      found.push({ start: m.index!, end: m.index! + m[0].length, kind: r.kind })
+      const len = r.take ? r.take(m[0]) : m[0].length
+      if (len > 0) found.push({ start: m.index!, end: m.index! + len, kind: r.kind })
     }
   }
   // Keep the earliest, then longest, non-overlapping spans.

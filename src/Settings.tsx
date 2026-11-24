@@ -42,7 +42,7 @@ export default function SettingsPage() {
 
         <section className="card col">
           <h4>Redaction</h4>
-          <p className="small muted">Emails, phone numbers, Luhn-valid card numbers and IP addresses are always redacted before anything else happens.</p>
+          <p className="small muted">Emails, phone numbers, Luhn-valid card numbers and IPv4/IPv6 addresses are always redacted before anything else happens. Detection is heuristic, so it can miss things.</p>
           <label className="check"><input type="checkbox" checked={s.redactAddresses} onChange={e => setSettings({ redactAddresses: e.target.checked })} />Street addresses and postal codes</label>
           <label className="check"><input type="checkbox" checked={s.redactNames} onChange={e => setSettings({ redactNames: e.target.checked })} />Names customers introduce (“my name is …”)</label>
         </section>
