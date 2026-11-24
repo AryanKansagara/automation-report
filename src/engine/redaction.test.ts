@@ -32,6 +32,13 @@ test('redact: name cues are case-insensitive', () => {
   assert.equal(text('NAME: Ana'), 'NAME: [NAME]')
 })
 
+test('redact: short names that are also ordinary words are redacted', () => {
+  assert.equal(text('My name is An Nguyen'), 'My name is [NAME]')
+  assert.equal(text('My name is Kim So'), 'My name is [NAME]')
+  assert.equal(text('My name is Kim An.'), 'My name is [NAME].')
+  assert.equal(text('MY NAME IS ZED AND I NEED HELP'), 'MY NAME IS [NAME] AND I NEED HELP')
+})
+
 test('redact: ordinary phrases after "my name is" are not names', () => {
   for (const s of ['my name is wrong on the invoice', 'My name is wrong on the invoice', 'My name is Wrong on the invoice', 'my name is spelled wrong', 'my name is not on the list']) {
     assert.equal(text(s), s)

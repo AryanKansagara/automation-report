@@ -29,7 +29,9 @@ function nameLength(m: string): number {
   let end = 0
   for (const w of [...m.matchAll(/\S+/gu)].slice(0, 2)) {
     const word = w[0].replace(/['’-]+$/, '')
-    if (!/^\p{Lu}/u.test(word) || NAME_STOP.has(word.toLowerCase())) break
+    // "An" and "So" are real names: a short title-case word is redacted, the safer error.
+    const shortTitle = /^\p{Lu}\p{Ll}{1,2}$/u.test(word)
+    if (!/^\p{Lu}/u.test(word) || (!shortTitle && NAME_STOP.has(word.toLowerCase()))) break
     end = w.index + word.length
   }
   return end
