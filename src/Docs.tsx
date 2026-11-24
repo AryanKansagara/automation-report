@@ -115,7 +115,13 @@ export default function Docs() {
 
           <h2 id="privacy">Privacy and sync</h2>
           <ul>
-            <li>Files are read with the browser File API. Redaction of emails, phones, card numbers (Luhn-checked), IP addresses, street addresses, postal codes and self-introduced names happens first, then cleaning, then embedding.</li>
+            <li>Files are read with the browser File API. Redaction happens first, then cleaning, then embedding.</li>
+            <li>
+              Redaction is heuristic pattern matching, not a guarantee. It looks for: emails (including accented letters), phone numbers, Luhn-valid card numbers, IPv4 and IPv6 addresses, North American street addresses and postal codes, and names a customer introduces (“my name is …”, “Name: …”, any capitalization of the cue; the name itself must start with a capital letter). It runs on the subject, message, agent replies, channel and tags. A ticket id that contains personal data is replaced by a neutral id such as <code>redacted-12</code>; duplicates are found on the original id first, so different people stay separate tickets. Validation messages never repeat file contents. The column-mapping preview and the “Original” pane in the redaction preview show your own file locally and are never stored.
+            </li>
+            <li>
+              Not detected: names without a self-introduction cue, other address formats, government ids such as SSNs, account or order numbers, usernames, and personal data in columns the importer does not read. Review the preview on a few of your own tickets before analyzing.
+            </li>
             <li>The embedding model (all-MiniLM-L6-v2, quantized) downloads from the Hugging Face CDN once and runs in a Web Worker. No ticket text is sent anywhere.</li>
             <li>Signed out, everything stays in IndexedDB on this device. Signed in, the project settings and the derived report sync: intent names, descriptions, keywords, counts, scores, overrides, ROI inputs and article titles. Ticket text, example phrasings, embeddings and article bodies never sync.</li>
             <li>Account menu: export all your data as JSON, delete your cloud data, or delete your account.</li>

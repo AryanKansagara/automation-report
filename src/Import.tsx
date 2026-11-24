@@ -129,7 +129,7 @@ export default function ImportPage({ projectId }: { projectId?: string }) {
               <label className="check"><input type="checkbox" checked={settings.redactAddresses} onChange={e => { setSettings({ redactAddresses: e.target.checked }); normalize(text) }} />Redact street addresses and postal codes</label>
               <label className="check"><input type="checkbox" checked={settings.redactNames} onChange={e => { setSettings({ redactNames: e.target.checked }); normalize(text) }} />Redact self-introduced names</label>
             </div>
-            <p className="xs faint" style={{ marginTop: 6 }}>Emails, phone numbers, Luhn-valid card numbers and IP addresses are always redacted.</p>
+            <p className="xs faint" style={{ marginTop: 6 }}>Emails, phone numbers, Luhn-valid card numbers and IPv4/IPv6 addresses are always redacted, including in ticket ids, tags and channel. Detection is heuristic, so it can miss things.</p>
             {result.report.samples.length ? result.report.samples.slice(0, 3).map((s, i) => (
               <div className="redact-pair" key={i} style={{ marginTop: 14 }}>
                 <div><div className="xs faint" style={{ marginBottom: 6 }}>Original</div><div className="well"><Hl text={s.before} spans={s.spans} /></div></div>
